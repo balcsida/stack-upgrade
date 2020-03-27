@@ -1,17 +1,23 @@
 # Upgrading Your Git Repository
 
-Support will provide you with a script that can be run to upgrade your Git repo
-to the new structure. The script, apart from deleting and copying files, will
-set the images tags for each service to 4.0.0. In order for the services to be
-compatible with the new folder structure, 4.x images must be used.
+First, use the `upgrade-script.sh` that can be run to update your Git repo to
+the new structure.
 
-# Running `lcp deploy`
+The script, apart from deleting and copying files, will set the images tags for
+each service to 4.0.0. In order for the services to be compatible with the new
+folder structure, 4.x images must be used.
 
-In this new structure, the image is hard-coded into the `LCP.json` of each
-service. Typically if you want to deploy one service, you can navigate to the
-service and run `lcp deploy`. For example, `cd webserver && lcp deploy`. Things
-work slightly different for the liferay service because it needs to be built
-first. Use the following command to deploy Liferay:
+Once, you made those changes locally, you're ready to deploy to your development
+environment.
+
+# Deploy using the CLI
+
+In this new structure, the image version is declared into the `LCP.json` of each
+service instead of the `gradle.properties` file. Typically if you want to deploy
+one service, you can navigate to the service and run `lcp deploy`. For example,
+`cd webserver && lcp deploy`. Things work slightly different for the liferay
+service because it needs to be built first. Use the following command to deploy
+Liferay:
 
 ```
 cd liferay
