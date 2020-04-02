@@ -33,8 +33,8 @@ main() {
     exit
   fi
 
-  if ! curl --version &> /dev/null; then
-    >&2 echo "This script requires curl to be installed"
+  if ! wget --version &> /dev/null; then
+    >&2 echo "This script requires wget to be installed"
 
     exit
   fi
@@ -66,7 +66,7 @@ printOpeningInstructions() {
   printf "\n### DXP Cloud Project Workspace Upgrade ###\n\n"
   printf "The script creates a commit on the current branch that adds itself to .gitignore.\n"
   printf "Next, a new branch called 'upgrade-workspace' is checked out, and all the changes for each service are committed separately.\n"
-  printf "The workspace upgrade assumes a clean working branch, and that curl and java are installed.\n"
+  printf "The workspace upgrade assumes a clean working branch, and that wget and java are installed.\n"
   printf "After the upgrade has run, you can completely undo and rerun it with the following commands:\n\n"
   printf "\tgit checkout <original-branch-name> && git reset --hard && git branch -D upgrade-workspace; ./upgrade-workspace.sh\n\n"
 
@@ -253,7 +253,7 @@ upgradeLiferayService() {
     gradle \
     .gradle
 
-  curl --output blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  wget -O blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
 
   rm -rf liferay/*
 
@@ -280,6 +280,9 @@ upgradeLiferayService() {
     touch liferay/configs/"$i"/patching/.keep
 
     mv liferay/config/"$i"/portal-*.properties liferay/configs/"$i"
+    [[ "$i" != common ]] && echo "include-and-override=portal-all.properties
+include-and-override=portal-env.properties" > liferay/configs/"$i"/portal-ext.properties
+
     mv liferay/config/"$i"/*.config liferay/configs/"$i"/osgi/configs
     mv liferay/config/"$i"/*.cfg liferay/configs/"$i"/osgi/configs
     mv liferay/deploy/"$i"/* liferay/configs/"$i"/deploy
