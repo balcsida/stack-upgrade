@@ -33,10 +33,16 @@ main() {
     exit
   fi
 
-  if ! wget --version &> /dev/null; then
-    >&2 echo "This script requires wget to be installed"
+  if ! curl --version &> /dev/null; then
+    CURL=false
+  fi
 
-    exit
+  if ! wget --version &> /dev/null; then
+    WGET=false
+  fi
+
+  if [ ! $CURL ] && [ ! $WGET ]; then
+    >&2 echo "This script requires curl or wget to be installed"
   fi
 
   printOpeningInstructions
@@ -253,7 +259,11 @@ upgradeLiferayService() {
     gradle \
     .gradle
 
-  wget -O blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  if [ "$WGET" != false ]; then
+    wget -O blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  else
+    curl --output blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  fi
 
   rm -rf liferay/*
 
