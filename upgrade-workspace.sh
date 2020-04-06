@@ -2,7 +2,7 @@
 
 shopt -s dotglob
 
-readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.0"}
+readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.1"}
 
 readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10.11"}
 readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10.2"}
