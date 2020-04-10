@@ -307,6 +307,7 @@ include-and-override=portal-env.properties" > liferay/configs/"$i"/portal-ext.pr
 
   sed -i '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
   sed -i "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
+  sed -i 's/2\.2\.[0-9]\+/2\.2\.11/' liferay/settings.gradle
 
   git add --all && git commit -m 'Upgrade liferay service folder structure'
 }
