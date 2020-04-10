@@ -205,7 +205,7 @@ upgradeCiService() {
 
   mv Jenkinsfile ci/#Jenkinsfile
 
-  touch 'ci/#Jenkinsfile-before-project-build' 'ci/#Jenkinsfile-before-cloud-build' 'ci/#Jenkinsfile-before-cloud-deploy' 'ci/#Jenkinsfile-post-always'
+  touch 'ci/#Jenkinsfile-after-all' 'ci/#Jenkinsfile-before-all' 'ci/#Jenkinsfile-before-cloud-build' 'ci/#Jenkinsfile-before-cloud-deploy' 'ci/#Jenkinsfile-post-always'
 
   git add --all && git commit -m 'Upgrade ci service folder structure'
 }
