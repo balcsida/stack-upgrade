@@ -21,7 +21,7 @@ readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.190.1-4.0.0-beta.2
 readonly WEBSERVER_LCP_IMAGE=${WEBSERVER_LCP_IMAGE:-"liferaycloud/nginx:1.16.1-4.0.0-beta.1"}
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  readonly SED_ARGS='-i ""'
+  readonly SED_ARGS='-i .wksbck'
 else
   readonly SED_ARGS='-i'
 fi
@@ -156,6 +156,8 @@ replaceImage() {
   echo "Setting image in $1/LCP.json to $2"
 
   sed $SED_ARGS "s|\(\\w*\"image\": \).*\$|\1\"${2}\",|" "$1"/LCP.json
+
+  [[ -f "$1"/LCP.json.wksbck ]] && rm "$1"/LCP.json.wksbck
 }
 
 upgradeBackupService() {
@@ -241,6 +243,8 @@ upgradeSearchService() {
 
   [[ -n "$ES_PLUGINS" ]] && sed $SED_ARGS "s/\(\\w*\"env\": {\)/\1\n    \"LCP_SERVICE_SEARCH_ES_PLUGINS\": \"${ES_PLUGINS}\",/" search/LCP.json
 
+  [[ -f search/LCP.json.wksbck ]] && rm search/LCP.json.wksbck
+
   git add --all && git commit -m 'Upgrade search service folder structure'
 }
 
@@ -307,6 +311,9 @@ include-and-override=portal-env.properties" >liferay/configs/"$i"/portal-ext.pro
   sed $SED_ARGS '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
   sed $SED_ARGS "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
   sed $SED_ARGS 's/2\.2\.[0-9]\+/2\.2\.11/' liferay/settings.gradle
+
+  [[ -f liferay/gradle.properties.wksbck ]] && rm liferay/gradle.properties.wksbck
+  [[ -f liferay/settings.gradle.wksbck ]] && rm liferay/settings.gradle.wksbck
 
   git add --all && git commit -m 'Upgrade liferay service folder structure'
 }
