@@ -2,41 +2,53 @@
 
 shopt -s dotglob
 
-readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.0"}
+readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.1"}
 
-readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10.11"}
-readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10.2"}
-readonly GRADLE_LCP_IMAGE_7_2=${GRADLE_LCP_IMAGE_7_2:-"liferay/dxp:7.2.10.1"}
+readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10-sp13"}
+readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10-dxp-16"}
+readonly GRADLE_LCP_IMAGE_7_2=${GRADLE_LCP_IMAGE_7_2:-"liferay/dxp:7.2.10-dxp-4"}
 
-readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dxp:7.0-4.0.0-alpha10"}
-readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.0-alpha10"}
-readonly LIFERAY_LCP_IMAGE_7_2=${LIFERAY_LCP_IMAGE_7_2:-"liferaycloud/liferay-dxp:7.2-4.0.0-alpha14"}
+readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dxp:7.0-4.0.0-beta.2"}
+readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.0-beta.2"}
+readonly LIFERAY_LCP_IMAGE_7_2=${LIFERAY_LCP_IMAGE_7_2:-"liferaycloud/liferay-dxp:7.2-4.0.0-beta.2"}
 
-readonly SEARCH_LCP_IMAGE_2=${SEARCH_LCP_IMAGE_2:-"liferaycloud/elasticsearch:2.4.6-4.0.0-alpha10"}
-readonly SEARCH_LCP_IMAGE_6=${SEARCH_LCP_IMAGE_6:-"liferaycloud/elasticsearch:6.8.6-4.0.0-alpha14"}
+readonly SEARCH_LCP_IMAGE_2=${SEARCH_LCP_IMAGE_2:-"liferaycloud/elasticsearch:2.4.6-4.0.0-beta.1"}
+readonly SEARCH_LCP_IMAGE_6=${SEARCH_LCP_IMAGE_6:-"liferaycloud/elasticsearch:6.8.6-4.0.0-beta.1"}
 
-readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.0-alpha13"}
-readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.0-alpha11"}
-readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.190.1-4.0.0-alpha13"}
-readonly WEBSERVER_LCP_IMAGE=${WEBSERVER_LCP_IMAGE:-"liferaycloud/nginx:1.16.1-4.0.0-alpha14"}
+readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.0-beta.1"}
+readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.0-beta.1"}
+readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.190.1-4.0.0-beta.3"}
+readonly WEBSERVER_LCP_IMAGE=${WEBSERVER_LCP_IMAGE:-"liferaycloud/nginx:1.16.1-4.0.0-beta.1"}
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  readonly SED_ARGS='-i .wksbck'
+else
+  readonly SED_ARGS='-i'
+fi
 
 main() {
-  if ! git status &> /dev/null; then
-    >&2 echo "This script must be run from a git repository"
+  if ! git status &>/dev/null; then
+    echo >&2 "This script must be run from a git repository"
 
     exit
   fi
 
-  if ! java -version &> /dev/null; then
-    >&2 echo "This script requires java to be installed"
+  if ! java -version &>/dev/null; then
+    echo >&2 "This script requires java to be installed"
 
     exit
   fi
 
-  if ! curl --version &> /dev/null; then
-    >&2 echo "This script requires curl to be installed"
+  if ! curl --version &>/dev/null; then
+    CURL=false
+  fi
 
-    exit
+  if ! wget --version &>/dev/null; then
+    WGET=false
+  fi
+
+  if [ ! $CURL ] && [ ! $WGET ]; then
+    echo >&2 "This script requires curl or wget to be installed"
   fi
 
   printOpeningInstructions
@@ -45,8 +57,8 @@ main() {
   promptForEnvironments
   promptForESPlugins
 
-  if ! grep "upgrade-workspace" .gitignore &> /dev/null; then
-    printf '\nupgrade-workspace.sh' >> .gitignore
+  if ! grep "upgrade-workspace" .gitignore &>/dev/null; then
+    printf '\nupgrade-workspace.sh' >>.gitignore
     git add .gitignore && git commit -m 'Add upgrade script to .gitignore'
   fi
 
@@ -66,7 +78,7 @@ printOpeningInstructions() {
   printf "\n### DXP Cloud Project Workspace Upgrade ###\n\n"
   printf "The script creates a commit on the current branch that adds itself to .gitignore.\n"
   printf "Next, a new branch called 'upgrade-workspace' is checked out, and all the changes for each service are committed separately.\n"
-  printf "The workspace upgrade assumes a clean working branch, and that curl and java are installed.\n"
+  printf "The workspace upgrade assumes a clean working branch, and that wget and java are installed.\n"
   printf "After the upgrade has run, you can completely undo and rerun it with the following commands:\n\n"
   printf "\tgit checkout <original-branch-name> && git reset --hard && git branch -D upgrade-workspace; ./upgrade-workspace.sh\n\n"
 
@@ -79,27 +91,26 @@ promptForLiferayVersion() {
 
   PS3='Please select the Liferay DXP version, which will determine the Liferay CLOUD image set in liferay/LCP.json and the Liferay image set in liferay/gradle.properties: '
   options=("7.0" "7.1" "7.2")
-  select opt in "${options[@]}"
-  do
+  select opt in "${options[@]}"; do
     DXP_VERSION=$opt
     case $opt in
-      7.0)
-        GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_0};
-        LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_0};
-        break
-        ;;
-      7.1)
-        GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_1};
-        LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_1};
-        break
-        ;;
-      7.2)
-        GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_2};
-        LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_2};
-        DXP_VERSION=$opt
-        break
-        ;;
-      *) >&2 echo "Invalid selection; please select 1..3";;
+    7.0)
+      GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_0}
+      LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_0}
+      break
+      ;;
+    7.1)
+      GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_1}
+      LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_1}
+      break
+      ;;
+    7.2)
+      GRADLE_LCP_IMAGE=${GRADLE_LCP_IMAGE_7_2}
+      LIFERAY_LCP_IMAGE=${LIFERAY_LCP_IMAGE_7_2}
+      DXP_VERSION=$opt
+      break
+      ;;
+    *) echo >&2 "Invalid selection; please select 1..3" ;;
     esac
   done
 
@@ -122,7 +133,7 @@ promptForEnvironments() {
   printf "\nThis script will create an environment folder in each service for the following environments:\n"
 
   for i in "${ENVIRONMENTS[@]}"; do
-      echo "$i"
+    echo "$i"
   done
 }
 
@@ -144,13 +155,9 @@ promptForESPlugins() {
 replaceImage() {
   echo "Setting image in $1/LCP.json to $2"
 
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s|\(\\w*\"image\": \).*\$|\1\"${2}\",|" "$1"/LCP.json
-    [ $? = 1 ] && exit
-  else
-    sed -i "s|\(\\w*\"image\": \).*\$|\1\"${2}\",|" "$1"/LCP.json
-    [ $? = 1 ] && exit
-  fi
+  sed $SED_ARGS "s|\(\\w*\"image\": \).*\$|\1\"${2}\",|" "$1"/LCP.json
+
+  [[ -f "$1"/LCP.json.wksbck ]] && rm "$1"/LCP.json.wksbck
 }
 
 upgradeBackupService() {
@@ -199,7 +206,7 @@ upgradeCiService() {
 
   mv Jenkinsfile ci/#Jenkinsfile
 
-  touch 'ci/#Jenkinsfile-before-project-build' 'ci/#Jenkinsfile-before-cloud-build' 'ci/#Jenkinsfile-before-cloud-deploy' 'ci/#Jenkinsfile-post-always'
+  touch 'ci/#Jenkinsfile-after-all' 'ci/#Jenkinsfile-before-all' 'ci/#Jenkinsfile-before-cloud-build' 'ci/#Jenkinsfile-before-cloud-deploy' 'ci/#Jenkinsfile-post-always'
 
   git add --all && git commit -m 'Upgrade ci service folder structure'
 }
@@ -234,7 +241,9 @@ upgradeSearchService() {
 
   rm -rf search/config search/deploy search/license search/script
 
-  [[ -n "$ES_PLUGINS" ]] && sed -i "s/\(\\w*\"env\": {\)/\1\n    \"LCP_SERVICE_SEARCH_ES_PLUGINS\": \"${ES_PLUGINS}\",/" search/LCP.json
+  [[ -n "$ES_PLUGINS" ]] && sed $SED_ARGS "s/\(\\w*\"env\": {\)/\1\n    \"LCP_SERVICE_SEARCH_ES_PLUGINS\": \"${ES_PLUGINS}\",/" search/LCP.json
+
+  [[ -f search/LCP.json.wksbck ]] && rm search/LCP.json.wksbck
 
   git add --all && git commit -m 'Upgrade search service folder structure'
 }
@@ -253,7 +262,11 @@ upgradeLiferayService() {
     gradle \
     .gradle
 
-  curl --output blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  if [ "$WGET" != false ]; then
+    wget -O blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  else
+    curl --output blade.jar https://repo1.maven.org/maven2/com/liferay/blade/com.liferay.blade.cli/${BLADE_VERSION}/com.liferay.blade.cli-${BLADE_VERSION}.jar
+  fi
 
   rm -rf liferay/*
 
@@ -280,6 +293,9 @@ upgradeLiferayService() {
     touch liferay/configs/"$i"/patching/.keep
 
     mv liferay/config/"$i"/portal-*.properties liferay/configs/"$i"
+    [[ "$i" != common ]] && echo "include-and-override=portal-all.properties
+include-and-override=portal-env.properties" >liferay/configs/"$i"/portal-ext.properties
+
     mv liferay/config/"$i"/*.config liferay/configs/"$i"/osgi/configs
     mv liferay/config/"$i"/*.cfg liferay/configs/"$i"/osgi/configs
     mv liferay/deploy/"$i"/* liferay/configs/"$i"/deploy
@@ -292,8 +308,12 @@ upgradeLiferayService() {
 
   rm -rf liferay/configs/prod
 
-  sed -i '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
-  sed -i "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
+  sed $SED_ARGS '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
+  sed $SED_ARGS "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
+  sed $SED_ARGS 's/2\.2\.[0-9]\+/2\.2\.11/' liferay/settings.gradle
+
+  [[ -f liferay/gradle.properties.wksbck ]] && rm liferay/gradle.properties.wksbck
+  [[ -f liferay/settings.gradle.wksbck ]] && rm liferay/settings.gradle.wksbck
 
   git add --all && git commit -m 'Upgrade liferay service folder structure'
 }
@@ -330,7 +350,7 @@ cleanupObsoleteFiles() {
 
   rm -rf \
     README-dxpcloud.md \
-    README.md \
+    README.md
 
   rm -rf lcp
 
