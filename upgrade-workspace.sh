@@ -26,7 +26,56 @@ else
   readonly SED_ARGS='-i'
 fi
 
+readonly PROJECTS_URL=https://api.liferay.cloud/projects
+
 main() {
+  validate_program_installation
+
+  print_opening_instructions
+
+  prompt_for_database_secret_variables
+  prompt_for_liferay_version
+  prompt_for_environments
+  prompt_for_elasticsearch_plugins
+
+  create_database_secrets
+
+  checkout_upgrade_workspace_branch
+
+  upgrade_backup_service
+  upgrade_ci_service
+  upgrade_database_service
+  upgrade_search_service
+  upgrade_liferay_service
+  upgrade_webserver_service
+
+  cleanup_obsolete_files
+}
+
+checkout_upgrade_workspace_branch() {
+  if ! grep "upgrade-workspace" .gitignore &>/dev/null; then
+    printf '\nupgrade-workspace.sh' >>.gitignore
+    git add .gitignore && git commit -m 'Add upgrade script to .gitignore'
+  fi
+
+  git checkout -b upgrade-workspace
+}
+
+prompt_for_database_secret_variables() {
+  printf "\n"
+  read -p "Please enter your project id: " -r PROJECT_ID
+  read -p "Please enter a valid username that is a contributor or admin on the project ${PROJECT_ID}. This user will be used to create database secrets: " -r USER
+  read -p "Please enter a valid password for the user you just entered: " -rs PASSWORD
+
+  readonly PORTAL_ALL_PROPERTIES_LOCATION=lcp/liferay/config/common/portal-all.properties
+
+  DATABASE_PASSWORD=$(grep "jdbc.default.password" "${PORTAL_ALL_PROPERTIES_LOCATION}" | cut -d '=' -f 2)
+
+  [[ -z "${DATABASE_PASSWORD}" ]] &&
+    read -p "Could not find jdbc.default.password in ${PORTAL_ALL_PROPERTIES_LOCATION}. Please enter your database password: " -r DATABASE_PASSWORD
+}
+
+validate_program_installation() {
   if ! git status &>/dev/null; then
     echo >&2 "This script must be run from a git repository"
 
@@ -50,42 +99,77 @@ main() {
   if [ ! $CURL ] && [ ! $WGET ]; then
     echo >&2 "This script requires curl or wget to be installed"
   fi
-
-  printOpeningInstructions
-
-  promptForLiferayVersion
-  promptForEnvironments
-  promptForESPlugins
-
-  if ! grep "upgrade-workspace" .gitignore &>/dev/null; then
-    printf '\nupgrade-workspace.sh' >>.gitignore
-    git add .gitignore && git commit -m 'Add upgrade script to .gitignore'
-  fi
-
-  git checkout -b upgrade-workspace
-
-  upgradeBackupService
-  upgradeCiService
-  upgradeDatabaseService
-  upgradeSearchService
-  upgradeLiferayService
-  upgradeWebserverService
-
-  cleanupObsoleteFiles
 }
 
-printOpeningInstructions() {
+create_database_secrets() {
+  for env in "${ENVIRONMENTS[@]}"; do
+    [[ "$env" == common ]] && continue
+
+    create_secret "${env}" 'lcp-secret-database-name' 'lportal'
+    create_secret "${env}" 'lcp-secret-database-user' 'dxpcloud'
+    create_secret "${env}" 'lcp-secret-database-password' "${DATABASE_PASSWORD}"
+  done
+}
+
+create_secret() {
+  readonly local env_id="${PROJECT_ID}-${1}"
+  readonly local secret_name="${2}"
+  readonly local secret_value="${3}"
+
+  local secrets
+
+  if [ "$WGET" != false ]; then
+    secrets=$(
+      wget "${PROJECTS_URL}/${env_id}/secrets" \
+        --auth-no-challenge \
+        -O - \
+        --user="${USER}" \
+        --password="${PASSWORD}"
+    )
+  else
+    secrets=$(
+      curl "${PROJECTS_URL}/${env_id}/secrets" -X GET -u "${USER}":"${PASSWORD}"
+    )
+  fi
+
+  if echo "${secrets}" | grep "${secret_name}" &>/dev/null; then
+    echo "The secret '${secret_name}' already exists, skipping secret creation"
+
+    return
+  fi
+
+  echo "creating secret for ${env_id} ${secret_name}=${secret_value}"
+
+  if [ "$WGET" != false ]; then
+    wget "${PROJECTS_URL}/${env_id}/secrets" \
+      --auth-no-challenge \
+      --user="${USER}" \
+      --password="${PASSWORD}" \
+      --post-data="name=${secret_name}&value=${secret_value}"
+  else
+    curl "${PROJECTS_URL}/${env_id}/secrets" \
+      -X POST \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -u "${USER}":"${PASSWORD}" \
+      -d $'{
+        "name": "'"${secret_name}"'",
+        "value": "'"${secret_value}"'"
+      }'
+  fi
+}
+
+print_opening_instructions() {
   printf "\n### DXP Cloud Project Workspace Upgrade ###\n\n"
   printf "The script creates a commit on the current branch that adds itself to .gitignore.\n"
   printf "Next, a new branch called 'upgrade-workspace' is checked out, and all the changes for each service are committed separately.\n"
-  printf "The workspace upgrade assumes a clean working branch, and that wget and java are installed.\n"
+  printf "The workspace upgrade assumes a clean working branch, and that wget/curl and java are installed.\n"
   printf "After the upgrade has run, you can completely undo and rerun it with the following commands:\n\n"
   printf "\tgit checkout <original-branch-name> && git reset --hard && git branch -D upgrade-workspace; ./upgrade-workspace.sh\n\n"
 
   read -rs -p "Press enter to continue: "
 }
 
-promptForLiferayVersion() {
+prompt_for_liferay_version() {
   printf "\n"
   printf "\n"
 
@@ -120,7 +204,7 @@ promptForLiferayVersion() {
   echo "The image in liferay/gradle.properties will be set to $GRADLE_LCP_IMAGE"
 }
 
-promptForEnvironments() {
+prompt_for_environments() {
   printf '\nPlease enter a comma-delimited list of the different environments in your project, apart from the "common" environment.'
   printf '\nFor example, you can write "dev,prd". This script will only copy files from these environments and the common environment.'
   printf '\nTaking the webserver service as an example, if you enter "dev", files will be copied from lcp/webserver/config/dev to webserver/configs/dev/conf.d.'
@@ -132,12 +216,12 @@ promptForEnvironments() {
 
   printf "\nThis script will create an environment folder in each service for the following environments:\n"
 
-  for i in "${ENVIRONMENTS[@]}"; do
-    echo "$i"
+  for env in "${ENVIRONMENTS[@]}"; do
+    echo "$env"
   done
 }
 
-promptForESPlugins() {
+prompt_for_elasticsearch_plugins() {
   printf '\nPlease enter a comma-delimited list of elasticsearch plugins you would like to install, if any.'
   printf '\nThis script will create an ENV var called LCP_SERVICE_SEARCH_ES_PLUGINS in search/LCP.json with the value that you set.'
   printf '\nIf you want, you can easily do this later, and you can set LCP_SERVICE_SEARCH_ES_PLUGINS per environment as well.'
@@ -160,7 +244,7 @@ replaceImage() {
   [[ -f "$1"/LCP.json.wksbck ]] && rm "$1"/LCP.json.wksbck
 }
 
-upgradeBackupService() {
+upgrade_backup_service() {
   printf "\n### Upgrading backup service folder structure ###\n\n"
 
   mkdir backup
@@ -169,11 +253,11 @@ upgradeBackupService() {
 
   replaceImage backup "${BACKUP_LCP_IMAGE}"
 
-  for i in "${ENVIRONMENTS[@]}"; do
-    mkdir -p backup/configs/"$i"/scripts
-    touch backup/configs/"$i"/scripts/.keep
+  for env in "${ENVIRONMENTS[@]}"; do
+    mkdir -p backup/configs/"$env"/scripts
+    touch backup/configs/"$env"/scripts/.keep
 
-    mv backup/script/"$i"/* backup/configs/"$i"/scripts
+    mv backup/script/"$env"/* backup/configs/"$env"/scripts
   done
 
   rm -rf backup/script
@@ -181,7 +265,7 @@ upgradeBackupService() {
   git add --all && git commit -m 'Upgrade backup service folder structure'
 }
 
-upgradeDatabaseService() {
+upgrade_database_service() {
   printf "\n ### Upgrading database service folder structure ###\n\n"
 
   mkdir database
@@ -193,7 +277,7 @@ upgradeDatabaseService() {
   git add --all && git commit -m 'Upgrade database service folder structure'
 }
 
-upgradeCiService() {
+upgrade_ci_service() {
   printf "\n ### Upgrading ci service folder structure ###\n\n"
 
   mkdir ci
@@ -211,7 +295,7 @@ upgradeCiService() {
   git add --all && git commit -m 'Upgrade ci service folder structure'
 }
 
-upgradeSearchService() {
+upgrade_search_service() {
   printf "\n### Upgrading search service folder structure ###\n\n"
 
   mkdir search
@@ -226,17 +310,17 @@ upgradeSearchService() {
 
   replaceImage search "${SEARCH_LCP_IMAGE}"
 
-  for i in "${ENVIRONMENTS[@]}"; do
-    mkdir -p search/configs/"$i"/config
-    touch search/configs/"$i"/config/.keep
-    mkdir -p search/configs/"$i"/license
-    touch search/configs/"$i"/license/.keep
-    mkdir -p search/configs/"$i"/scripts
-    touch search/configs/"$i"/scripts/.keep
+  for env in "${ENVIRONMENTS[@]}"; do
+    mkdir -p search/configs/"$env"/config
+    touch search/configs/"$env"/config/.keep
+    mkdir -p search/configs/"$env"/license
+    touch search/configs/"$env"/license/.keep
+    mkdir -p search/configs/"$env"/scripts
+    touch search/configs/"$env"/scripts/.keep
 
-    mv search/config/"$i"/* search/configs/"$i"/config
-    mv search/license/"$i"/* search/configs/"$i"/license
-    mv search/script/"$i"/* search/configs/"$i"/scripts
+    mv search/config/"$env"/* search/configs/"$env"/config
+    mv search/license/"$env"/* search/configs/"$env"/license
+    mv search/script/"$env"/* search/configs/"$env"/scripts
   done
 
   rm -rf search/config search/deploy search/license search/script
@@ -248,7 +332,7 @@ upgradeSearchService() {
   git add --all && git commit -m 'Upgrade search service folder structure'
 }
 
-upgradeLiferayService() {
+upgrade_liferay_service() {
   printf "\n### Upgrading liferay service folder structure ###\n\n"
 
   echo "Deleting obsolete files in git repo root related to the Liferay service..."
@@ -282,26 +366,26 @@ upgradeLiferayService() {
   mv themes liferay/
   mv wars liferay/
 
-  for i in "${ENVIRONMENTS[@]}"; do
-    mkdir -p liferay/configs/"$i"/osgi/configs
-    touch liferay/configs/"$i"/osgi/configs/.keep
-    mkdir -p liferay/configs/"$i"/deploy
-    touch liferay/configs/"$i"/deploy/.keep
-    mkdir -p liferay/configs/"$i"/scripts
-    touch liferay/configs/"$i"/scripts/.keep
-    mkdir -p liferay/configs/"$i"/patching
-    touch liferay/configs/"$i"/patching/.keep
+  for env in "${ENVIRONMENTS[@]}"; do
+    mkdir -p liferay/configs/"$env"/osgi/configs
+    touch liferay/configs/"$env"/osgi/configs/.keep
+    mkdir -p liferay/configs/"$env"/deploy
+    touch liferay/configs/"$env"/deploy/.keep
+    mkdir -p liferay/configs/"$env"/scripts
+    touch liferay/configs/"$env"/scripts/.keep
+    mkdir -p liferay/configs/"$env"/patching
+    touch liferay/configs/"$env"/patching/.keep
 
-    mv liferay/config/"$i"/portal-*.properties liferay/configs/"$i"
-    [[ "$i" != common ]] && echo "include-and-override=portal-all.properties
-include-and-override=portal-env.properties" >liferay/configs/"$i"/portal-ext.properties
+    mv liferay/config/"$env"/portal-*.properties liferay/configs/"$env"
+    [[ "$env" != common ]] && echo "include-and-override=portal-all.properties
+include-and-override=portal-env.properties" >liferay/configs/"$env"/portal-ext.properties
 
-    mv liferay/config/"$i"/*.config liferay/configs/"$i"/osgi/configs
-    mv liferay/config/"$i"/*.cfg liferay/configs/"$i"/osgi/configs
-    mv liferay/deploy/"$i"/* liferay/configs/"$i"/deploy
-    mv liferay/script/"$i"/* liferay/configs/"$i"/scripts
-    mv liferay/hotfix/"$i"/* liferay/configs/"$i"/patching
-    mv liferay/license/"$i"/* liferay/configs/"$i"/deploy
+    mv liferay/config/"$env"/*.config liferay/configs/"$env"/osgi/configs
+    mv liferay/config/"$env"/*.cfg liferay/configs/"$env"/osgi/configs
+    mv liferay/deploy/"$env"/* liferay/configs/"$env"/deploy
+    mv liferay/script/"$env"/* liferay/configs/"$env"/scripts
+    mv liferay/hotfix/"$env"/* liferay/configs/"$env"/patching
+    mv liferay/license/"$env"/* liferay/configs/"$env"/deploy
   done
 
   rm -rf liferay/config liferay/deploy liferay/script liferay/hotfix liferay/license
@@ -318,7 +402,7 @@ include-and-override=portal-env.properties" >liferay/configs/"$i"/portal-ext.pro
   git add --all && git commit -m 'Upgrade liferay service folder structure'
 }
 
-upgradeWebserverService() {
+upgrade_webserver_service() {
   printf "\n### Upgrading webserver service folder structure ###\n\n"
 
   mkdir webserver
@@ -327,17 +411,17 @@ upgradeWebserverService() {
 
   replaceImage webserver "${WEBSERVER_LCP_IMAGE}"
 
-  for i in "${ENVIRONMENTS[@]}"; do
-    mkdir -p webserver/configs/"$i"/conf.d
-    touch webserver/configs/"$i"/conf.d/.keep
-    mkdir -p webserver/configs/"$i"/public
-    touch webserver/configs/"$i"/public/.keep
-    mkdir -p webserver/configs/"$i"/scripts
-    touch webserver/configs/"$i"/scripts/.keep
+  for env in "${ENVIRONMENTS[@]}"; do
+    mkdir -p webserver/configs/"$env"/conf.d
+    touch webserver/configs/"$env"/conf.d/.keep
+    mkdir -p webserver/configs/"$env"/public
+    touch webserver/configs/"$env"/public/.keep
+    mkdir -p webserver/configs/"$env"/scripts
+    touch webserver/configs/"$env"/scripts/.keep
 
-    mv webserver/config/"$i"/* webserver/configs/"$i"/conf.d
-    mv webserver/deploy/"$i"/* webserver/configs/"$i"/public
-    mv webserver/script/"$i"/* webserver/configs/"$i"/scripts
+    mv webserver/config/"$env"/* webserver/configs/"$env"/conf.d
+    mv webserver/deploy/"$env"/* webserver/configs/"$env"/public
+    mv webserver/script/"$env"/* webserver/configs/"$env"/scripts
   done
 
   rm -rf webserver/config webserver/deploy webserver/script
@@ -345,7 +429,7 @@ upgradeWebserverService() {
   git add --all && git commit -m 'Upgrade webserver service folder structure'
 }
 
-cleanupObsoleteFiles() {
+cleanup_obsolete_files() {
   printf '\n### Deleting obsolete files in the root directory ### \n\n'
 
   rm -rf \
