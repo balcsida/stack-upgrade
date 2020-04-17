@@ -2,7 +2,7 @@
 
 shopt -s dotglob
 
-readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.1"}
+readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.2"}
 
 readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10-sp13"}
 readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10-dxp-16"}
@@ -394,10 +394,8 @@ include-and-override=portal-env.properties" >liferay/configs/"$env"/portal-ext.p
 
   sed $SED_ARGS '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
   sed $SED_ARGS "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
-  sed $SED_ARGS 's/2\.2\.[0-9]\+/2\.2\.11/' liferay/settings.gradle
 
   [[ -f liferay/gradle.properties.wksbck ]] && rm liferay/gradle.properties.wksbck
-  [[ -f liferay/settings.gradle.wksbck ]] && rm liferay/settings.gradle.wksbck
 
   git add --all && git commit -m 'Upgrade liferay service folder structure'
 }
