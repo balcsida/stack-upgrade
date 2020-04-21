@@ -26,7 +26,9 @@ else
   readonly SED_ARGS='-i'
 fi
 
-readonly PROJECTS_URL=https://api.liferay.cloud/projects
+readonly API_URL=https://api.liferay.cloud
+readonly LOGIN_URL=${API_URL}/login
+readonly PROJECTS_URL=${API_URL}/projects
 
 main() {
   validate_program_installation
@@ -64,8 +66,35 @@ checkout_upgrade_workspace_branch() {
 prompt_for_database_secret_variables() {
   printf "\n"
   read -p "Please enter your project id: " -r PROJECT_ID
-  read -p "Please enter a valid username that is a contributor or admin on the project ${PROJECT_ID}. This user will be used to create database secrets: " -r USER
-  read -p "Please enter a valid password for the user you just entered: " -rs PASSWORD
+  read -p "If you are using SSO, please retrieve the access_token cookie from an authenticated session with the Liferay DXP Cloud console and enter it here. Otherwise, press enter: " -r TOKEN
+
+  if [[ -z ${TOKEN} ]]; then
+    read -p "Access token is empty. Please enter a valid username that is a contributor or admin on the project ${PROJECT_ID}. This user will be used to create database secrets: " -r USER
+    read -p "Please enter a valid password for the user you just entered: " -rs PASSWORD
+
+    local login_response
+
+    if [ "$WGET" != false ]; then
+      login_response=$(
+        wget "${LOGIN_URL}" \
+          -O - \
+          --auth-no-challenge \
+          --post-data="email=${USER}&password=${PASSWORD}"
+      )
+    else
+      login_response=$(
+        curl "${LOGIN_URL}" \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -d $'{
+          "email": "'"${USER}"'",
+          "password": "'"${PASSWORD}"'"
+        }'
+      )
+    fi
+
+    TOKEN=$(echo "$login_response" | grep -Po '"token": *"\K[^"]*(?=")')
+  fi
 
   readonly PORTAL_ALL_PROPERTIES_LOCATION=lcp/liferay/config/common/portal-all.properties
 
@@ -112,23 +141,25 @@ create_database_secrets() {
 }
 
 create_secret() {
-  readonly local env_id="${PROJECT_ID}-${1}"
-  readonly local secret_name="${2}"
-  readonly local secret_value="${3}"
+  local env_id="${PROJECT_ID}-${1}"
+  local secret_name="${2}"
+  local secret_value="${3}"
 
   local secrets
 
   if [ "$WGET" != false ]; then
     secrets=$(
       wget "${PROJECTS_URL}/${env_id}/secrets" \
+        --header="Authorization: Bearer ${TOKEN}" \
+        --header='content-type: application/x-www-form-urlencoded' \
         --auth-no-challenge \
-        -O - \
-        --user="${USER}" \
-        --password="${PASSWORD}"
+        -O -
     )
   else
     secrets=$(
-      curl "${PROJECTS_URL}/${env_id}/secrets" -X GET -u "${USER}":"${PASSWORD}"
+      curl "${PROJECTS_URL}/${env_id}/secrets" \
+        -X GET \
+        -H "Authorization: Bearer ${TOKEN}"
     )
   fi
 
@@ -142,15 +173,15 @@ create_secret() {
 
   if [ "$WGET" != false ]; then
     wget "${PROJECTS_URL}/${env_id}/secrets" \
+      --header="Authorization: Bearer ${TOKEN}" \
+      --header='content-type: application/x-www-form-urlencoded' \
       --auth-no-challenge \
-      --user="${USER}" \
-      --password="${PASSWORD}" \
       --post-data="name=${secret_name}&value=${secret_value}"
   else
     curl "${PROJECTS_URL}/${env_id}/secrets" \
       -X POST \
+      -H "Authorization: Bearer ${TOKEN}" \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -u "${USER}":"${PASSWORD}" \
       -d $'{
         "name": "'"${secret_name}"'",
         "value": "'"${secret_value}"'"
