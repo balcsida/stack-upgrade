@@ -66,35 +66,21 @@ checkout_upgrade_workspace_branch() {
 prompt_for_database_secret_variables() {
   printf "\n"
   read -p "Please enter your project id: " -r PROJECT_ID
-  read -p "If you are using SSO, please retrieve the access_token cookie from an authenticated session with the Liferay DXP Cloud console and enter it here. Otherwise, press enter: " -r TOKEN
 
-  if [[ -z ${TOKEN} ]]; then
-    read -p "Access token is empty. Please enter a valid username that is a contributor or admin on the project ${PROJECT_ID}. This user will be used to create database secrets: " -r USER
-    read -p "Please enter a valid password for the user you just entered: " -rs PASSWORD
+  lcp logout
+  echo 'Please login to DXP Cloud Console'
+  lcp login
 
-    local login_response
+  LCP_CONFIG_FILE=$HOME/.lcp
 
-    if [ "$WGET" != false ]; then
-      login_response=$(
-        wget "${LOGIN_URL}" \
-          -O - \
-          --auth-no-challenge \
-          --post-data="email=${USER}&password=${PASSWORD}"
-      )
-    else
-      login_response=$(
-        curl "${LOGIN_URL}" \
-          -X POST \
-          -H "Content-Type: application/json" \
-          -d $'{
-          "email": "'"${USER}"'",
-          "password": "'"${PASSWORD}"'"
-        }'
-      )
-    fi
-
-    TOKEN=$(echo "$login_response" | grep -Po '"token": *"\K[^"]*(?=")')
+  if [[ -f "$LCP_CONFIG_FILE" ]]; then
+    echo "$LCP_CONFIG_FILE exists"
+  else
+    echo "$LCP_CONFIG_FILE does not exist!"
+    exit 1
   fi
+
+  TOKEN=$(grep -A 2 "infrastructure=liferay.cloud" "$LCP_CONFIG_FILE" | awk -F "=" '/token/ {print $2}')
 
   readonly PORTAL_ALL_PROPERTIES_LOCATION=lcp/liferay/config/common/portal-all.properties
 
@@ -125,8 +111,16 @@ validate_program_installation() {
     WGET=false
   fi
 
-  if [ ! $CURL ] && [ ! $WGET ]; then
+  if [[ $CURL == false ]] && [[ $WGET == false ]]; then
     echo >&2 "This script requires curl or wget to be installed"
+
+    exit
+  fi
+
+  if ! lcp version &>/dev/null; then
+    echo >&2 "This script requires lcp to be installed"
+
+    exit
   fi
 }
 
@@ -134,34 +128,36 @@ create_database_secrets() {
   for env in "${ENVIRONMENTS[@]}"; do
     [[ "$env" == common ]] && continue
 
-    create_secret "${env}" 'lcp-secret-database-name' 'lportal'
-    create_secret "${env}" 'lcp-secret-database-user' 'dxpcloud'
-    create_secret "${env}" 'lcp-secret-database-password' "${DATABASE_PASSWORD}"
+    local secrets
+    local env_id="${PROJECT_ID}-${env}"
+
+    if [ "$WGET" != false ]; then
+      secrets=$(
+        wget "${PROJECTS_URL}/${env_id}/secrets" \
+          --header="Authorization: Bearer ${TOKEN}" \
+          --header='content-type: application/x-www-form-urlencoded' \
+          --auth-no-challenge \
+          -O -
+      )
+    else
+      secrets=$(
+        curl "${PROJECTS_URL}/${env_id}/secrets" \
+          -X GET \
+          -H "Authorization: Bearer ${TOKEN}"
+      )
+    fi
+
+    create_secret "${env_id}" "${secrets}" 'lcp-secret-database-name' 'lportal'
+    create_secret "${env_id}" "${secrets}" 'lcp-secret-database-user' 'dxpcloud'
+    create_secret "${env_id}" "${secrets}" 'lcp-secret-database-password' "${DATABASE_PASSWORD}"
   done
 }
 
 create_secret() {
-  local env_id="${PROJECT_ID}-${1}"
-  local secret_name="${2}"
-  local secret_value="${3}"
-
-  local secrets
-
-  if [ "$WGET" != false ]; then
-    secrets=$(
-      wget "${PROJECTS_URL}/${env_id}/secrets" \
-        --header="Authorization: Bearer ${TOKEN}" \
-        --header='content-type: application/x-www-form-urlencoded' \
-        --auth-no-challenge \
-        -O -
-    )
-  else
-    secrets=$(
-      curl "${PROJECTS_URL}/${env_id}/secrets" \
-        -X GET \
-        -H "Authorization: Bearer ${TOKEN}"
-    )
-  fi
+  local env_id="${1}"
+  local secrets="${2}"
+  local secret_name="${3}"
+  local secret_value="${4}"
 
   if echo "${secrets}" | grep "${secret_name}" &>/dev/null; then
     echo "The secret '${secret_name}' already exists, skipping secret creation"
@@ -193,7 +189,7 @@ print_opening_instructions() {
   printf "\n### DXP Cloud Project Workspace Upgrade ###\n\n"
   printf "The script creates a commit on the current branch that adds itself to .gitignore.\n"
   printf "Next, a new branch called 'upgrade-workspace' is checked out, and all the changes for each service are committed separately.\n"
-  printf "The workspace upgrade assumes a clean working branch, and that wget/curl and java are installed.\n"
+  printf "The workspace upgrade assumes a clean working branch, and that wget/curl, java, and lcp are installed.\n"
   printf "After the upgrade has run, you can completely undo and rerun it with the following commands:\n\n"
   printf "\tgit checkout <original-branch-name> && git reset --hard && git branch -D upgrade-workspace; ./upgrade-workspace.sh\n\n"
 
@@ -201,7 +197,6 @@ print_opening_instructions() {
 }
 
 prompt_for_liferay_version() {
-  printf "\n"
   printf "\n"
 
   PS3='Please select the Liferay DXP version, which will determine the Liferay CLOUD image set in liferay/LCP.json and the Liferay image set in liferay/gradle.properties: '
