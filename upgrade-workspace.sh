@@ -12,12 +12,12 @@ readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dx
 readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.0-beta.2"}
 readonly LIFERAY_LCP_IMAGE_7_2=${LIFERAY_LCP_IMAGE_7_2:-"liferaycloud/liferay-dxp:7.2-4.0.0-beta.2"}
 
-readonly SEARCH_LCP_IMAGE_2=${SEARCH_LCP_IMAGE_2:-"liferaycloud/elasticsearch:2.4.6-4.0.0-beta.1"}
-readonly SEARCH_LCP_IMAGE_6=${SEARCH_LCP_IMAGE_6:-"liferaycloud/elasticsearch:6.8.6-4.0.0-beta.1"}
+readonly SEARCH_LCP_IMAGE_2=${SEARCH_LCP_IMAGE_2:-"liferaycloud/elasticsearch:2.4.6-4.0.0-beta.2"}
+readonly SEARCH_LCP_IMAGE_6=${SEARCH_LCP_IMAGE_6:-"liferaycloud/elasticsearch:6.8.6-4.0.0-beta.2"}
 
-readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.0-beta.1"}
-readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.0-beta.1"}
-readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.190.1-4.0.0-beta.3"}
+readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.0-beta.2"}
+readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.0-beta.3"}
+readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.222.1-4.0.0-beta.5"}
 readonly WEBSERVER_LCP_IMAGE=${WEBSERVER_LCP_IMAGE:-"liferaycloud/nginx:1.16.1-4.0.0-beta.1"}
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
