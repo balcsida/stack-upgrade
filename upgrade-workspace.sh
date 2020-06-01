@@ -4,9 +4,9 @@ shopt -s dotglob
 
 readonly BLADE_VERSION=${BLADE_VERSION:-"3.9.2"}
 
-readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10-sp13"}
-readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10-dxp-16"}
-readonly GRADLE_LCP_IMAGE_7_2=${GRADLE_LCP_IMAGE_7_2:-"liferay/dxp:7.2.10-dxp-4"}
+readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10-sp13-202003272332"}
+readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10-sp4-202004031130"}
+readonly GRADLE_LCP_IMAGE_7_2=${GRADLE_LCP_IMAGE_7_2:-"liferay/dxp:7.2.10-sp2-202005120922"}
 
 readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dxp:7.0-4.0.0"}
 readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.0"}
