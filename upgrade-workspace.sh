@@ -418,7 +418,6 @@ include-and-override=portal-env.properties" >liferay/configs/"$env"/portal-ext.p
 
   rm -rf liferay/configs/prod
 
-  sed $SED_ARGS '/liferay\.workspace\.docker\.image\.liferay/s/^\s*#//' liferay/gradle.properties
   sed $SED_ARGS "s|\(liferay\.workspace\.docker\.image\.liferay=\).*\$|\1${GRADLE_LCP_IMAGE}|" liferay/gradle.properties
   sed  $SED_ARGS "s|\#liferay\.workspace\.docker\.image\.liferay=|liferay\.workspace\.docker\.image\.liferay=|" liferay/portal-test.properties
 
