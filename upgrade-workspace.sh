@@ -67,7 +67,6 @@ prompt_for_database_secret_variables() {
   printf "\n"
   read -p "Please enter your project id: " -r PROJECT_ID
 
-  lcp logout
   echo 'Please login to DXP Cloud Console'
   lcp login
 
