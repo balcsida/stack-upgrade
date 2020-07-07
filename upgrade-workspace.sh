@@ -51,6 +51,8 @@ main() {
   upgrade_liferay_service
   upgrade_webserver_service
 
+  move_remaining_files
+
   cleanup_obsolete_files
 }
 
@@ -450,6 +452,11 @@ upgrade_webserver_service() {
   rm -rf webserver/config webserver/deploy webserver/script
 
   git add --all && git commit -m 'Upgrade webserver service folder structure'
+}
+
+move_remaining_files() {
+  mv lcp/* .
+  git add --all && git commit -m 'Move remaining files from lcp folder to root'
 }
 
 cleanup_obsolete_files() {
