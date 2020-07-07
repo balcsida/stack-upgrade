@@ -8,16 +8,16 @@ readonly GRADLE_LCP_IMAGE_7_0=${GRADLE_LCP_IMAGE_7_0:-"liferay/dxp:7.0.10-sp13-2
 readonly GRADLE_LCP_IMAGE_7_1=${GRADLE_LCP_IMAGE_7_1:-"liferay/dxp:7.1.10-sp4-202004031130"}
 readonly GRADLE_LCP_IMAGE_7_2=${GRADLE_LCP_IMAGE_7_2:-"liferay/dxp:7.2.10-sp2-202005120922"}
 
-readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dxp:7.0-4.0.0"}
-readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.0"}
-readonly LIFERAY_LCP_IMAGE_7_2=${LIFERAY_LCP_IMAGE_7_2:-"liferaycloud/liferay-dxp:7.2-4.0.0"}
+readonly LIFERAY_LCP_IMAGE_7_0=${LIFERAY_LCP_IMAGE_7_0:-"liferaycloud/liferay-dxp:7.0-4.0.1"}
+readonly LIFERAY_LCP_IMAGE_7_1=${LIFERAY_LCP_IMAGE_7_1:-"liferaycloud/liferay-dxp:7.1-4.0.1"}
+readonly LIFERAY_LCP_IMAGE_7_2=${LIFERAY_LCP_IMAGE_7_2:-"liferaycloud/liferay-dxp:7.2-4.0.1"}
 
 readonly SEARCH_LCP_IMAGE_2=${SEARCH_LCP_IMAGE_2:-"liferaycloud/elasticsearch:2.4.6-4.0.0"}
 readonly SEARCH_LCP_IMAGE_6=${SEARCH_LCP_IMAGE_6:-"liferaycloud/elasticsearch:6.8.6-4.0.0"}
 
-readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.0"}
-readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.0"}
-readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.222.1-4.0.0"}
+readonly BACKUP_LCP_IMAGE=${BACKUP_LCP_IMAGE:-"liferaycloud/backup:4.0.3"}
+readonly DATABASE_LCP_IMAGE=${DATABASE_LCP_IMAGE:-"liferaycloud/database:4.0.1"}
+readonly CI_LCP_IMAGE=${CI_LCP_IMAGE:-"liferaycloud/jenkins:2.222.1-4.0.2"}
 readonly WEBSERVER_LCP_IMAGE=${WEBSERVER_LCP_IMAGE:-"liferaycloud/nginx:1.16.1-4.0.0"}
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
